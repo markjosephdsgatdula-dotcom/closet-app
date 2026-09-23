@@ -1,5 +1,5 @@
 // Bump this string whenever app files change so clients pick up the new version.
-const CACHE_NAME = "closet-app-v5";
+const CACHE_NAME = "closet-app-v6";
 
 const APP_SHELL = [
   "./",

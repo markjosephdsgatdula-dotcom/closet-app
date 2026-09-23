@@ -147,6 +147,17 @@
         <input type="password" id="apiKeyInput" placeholder="AIza...">
       </label>
       <p class="hint">Free to get at <strong>aistudio.google.com</strong> (Get API key). Stored only in this browser (localStorage). Used to call Gemini's vision API directly from your device to auto-detect garment type/color/tags. Leave blank to tag everything manually.</p>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+      <h2 style="margin-top:0;">Backup &amp; restore</h2>
+      <p class="hint">Everything (photos, tags, outfits, wear history) is stored only in this browser. Clearing browser data, switching devices, or an app reset would lose it all — export a backup file regularly, especially before switching phones or browsers.</p>
+      <button type="button" id="exportBackupBtn" class="secondary-btn" style="width:100%;margin-top:8px;">⬇ Export backup</button>
+      <label class="photo-btn" id="importBackupLabel" style="display:block;margin-top:10px;text-align:center;">
+        ⬆ Import backup
+        <input type="file" accept="application/json,.json" id="importBackupInput" hidden>
+      </label>
+      <p id="backupStatus" class="hint"></p>
     </div>
     <div class="sheet-actions">
       <button type="button" id="settingsCloseBtn" class="primary-btn">Save & Close</button>

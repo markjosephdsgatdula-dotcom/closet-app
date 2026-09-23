@@ -2,6 +2,7 @@ import { db, uid } from "./db.js";
 import { scanGarment, getApiKey, setApiKey } from "./vision.js";
 import { normalizePhotoLocal } from "./localCleanup.js";
 import { getLocation, getWeather, generateOutfit } from "./suggest.js";
+import { exportBackup, readBackupFile, importBackup } from "./backup.js";
 
 const view = document.getElementById("view");
 const tabButtons = document.querySelectorAll(".tab-btn");
@@ -542,6 +543,36 @@ document.getElementById("settingsBtn").addEventListener("click", () => {
 document.getElementById("settingsCloseBtn").addEventListener("click", () => {
   setApiKey(apiKeyInput.value.trim());
   settingsModal.close();
+});
+
+const backupStatus = document.getElementById("backupStatus");
+
+document.getElementById("exportBackupBtn").addEventListener("click", async () => {
+  try {
+    const { garmentCount, outfitCount, wearLogCount } = await exportBackup();
+    backupStatus.textContent = `Exported ${garmentCount} garment(s), ${outfitCount} outfit(s), ${wearLogCount} history entr(ies).`;
+  } catch (err) {
+    backupStatus.textContent = `Export failed: ${err.message}`;
+  }
+});
+
+document.getElementById("importBackupInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file) return;
+  try {
+    const data = await readBackupFile(file);
+    const summary = `${data.garments.length} garment(s), ${(data.outfits || []).length} outfit(s), ${(data.wearLog || []).length} history entr(ies)`;
+    if (!confirm(`Import this backup (${summary})? This REPLACES everything currently in the app — this cannot be undone.`)) {
+      return;
+    }
+    await importBackup(data);
+    await loadAll();
+    render();
+    backupStatus.textContent = `Imported ${summary}.`;
+  } catch (err) {
+    backupStatus.textContent = `Import failed: ${err.message}`;
+  }
 });
 
 // ---------- tabs ----------

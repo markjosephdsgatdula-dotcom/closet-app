@@ -56,6 +56,9 @@ export const db = {
   async delete(storeName, id) {
     return withStore(storeName, "readwrite", (store) => store.delete(id));
   },
+  async clear(storeName) {
+    return withStore(storeName, "readwrite", (store) => store.clear());
+  },
 };
 
 export function uid() {

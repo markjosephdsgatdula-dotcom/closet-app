@@ -520,7 +520,7 @@ document.getElementById("occasionChips").addEventListener("click", (e) => {
 
 function runSuggestion() {
   const weather = cachedWeather && !cachedWeather.unavailable ? cachedWeather : null;
-  currentSuggestion = generateOutfit(garments, currentOccasion, weather, excludedFromShuffle);
+  currentSuggestion = generateOutfit(garments, currentOccasion, weather, excludedFromShuffle, wearLog);
   renderSuggestion();
 }
 

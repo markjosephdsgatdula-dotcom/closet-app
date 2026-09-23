@@ -125,15 +125,22 @@ export function generateOutfit(garments, occasion, weather, excludeIds = new Set
   const pick = (slot, categories) => {
     const pool = candidatesFor(garments, categories, occasion, weather, slot).filter((g) => !excludeIds.has(g.id));
     if (!pool.length) return null;
-    if (chosenIds.length) {
-      const topK = pool.slice(0, Math.min(3, pool.length));
-      topK.sort((a, b) => coOccurrenceScore(b.id, chosenIds, coMap) - coOccurrenceScore(a.id, chosenIds, coMap));
-      const choice = topK[0];
-      chosenIds.push(choice.id);
-      return choice;
+
+    // A single clear least-worn winner (by wear COUNT) always wins outright — preference
+    // learning only gets a say among genuine ties, so it can never push a barely-worn
+    // item ahead of one that's truly been sitting unused, only help pick among equals.
+    const minCount = pool[0].wearCount || 0;
+    const tied = pool.filter((g) => (g.wearCount || 0) === minCount);
+
+    let choice = tied[0];
+    if (chosenIds.length && tied.length > 1) {
+      const ranked = [...tied].sort(
+        (a, b) => coOccurrenceScore(b.id, chosenIds, coMap) - coOccurrenceScore(a.id, chosenIds, coMap)
+      );
+      choice = ranked[0];
     }
-    chosenIds.push(pool[0].id);
-    return pool[0];
+    chosenIds.push(choice.id);
+    return choice;
   };
 
   const dress = pick("dress", SLOTS.dress);

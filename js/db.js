@@ -1,8 +1,16 @@
 const DB_NAME = "closet-db";
 const DB_VERSION = 2;
 
+// A single shared connection, reused across calls instead of opening a fresh one every
+// time. Also releases itself on "versionchange" so that if this app is open in another
+// tab and gets updated to a newer schema there, this tab's stale connection doesn't
+// permanently block that other tab's upgrade (IndexedDB upgrades otherwise hang forever
+// waiting for every open connection to a lower version to close).
+let dbPromise = null;
+
 function openDb() {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -19,9 +27,20 @@ function openDb() {
         db.createObjectStore("wishlist", { keyPath: "id" });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
   });
+  return dbPromise;
 }
 
 async function withStore(storeName, mode, fn) {

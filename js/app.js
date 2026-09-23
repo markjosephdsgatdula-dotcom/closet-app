@@ -60,6 +60,12 @@ function renderWishlist() {
   view.querySelectorAll("[data-delete-wishlist]").forEach((btn) =>
     btn.addEventListener("click", () => deleteWishlistItem(btn.dataset.deleteWishlist))
   );
+  view.querySelectorAll("[data-purchase-wishlist]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const w = wishlist.find((item) => item.id === btn.dataset.purchaseWishlist);
+      if (w) openGarmentModalFromWishlist(w);
+    })
+  );
 }
 
 function wishlistItemHtml(w) {
@@ -70,8 +76,11 @@ function wishlistItemHtml(w) {
         <div class="wishlist-name">${escapeHtml(w.name || w.category)}</div>
         <div class="wishlist-sub">${escapeHtml(w.category || "")}${w.colors?.length ? " · " + escapeHtml(w.colors.join(", ")) : ""}</div>
         <div class="wishlist-sub">${(w.tags || []).map((t) => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("")}</div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button type="button" class="primary-btn" data-purchase-wishlist="${w.id}" style="margin:0;padding:6px 12px;font-size:.8rem;">✓ Purchased</button>
+          <button type="button" class="danger-btn" data-delete-wishlist="${w.id}" style="margin:0;padding:6px 12px;font-size:.8rem;">Remove</button>
+        </div>
       </div>
-      <button type="button" class="danger-btn" data-delete-wishlist="${w.id}" style="margin:0;">Remove</button>
     </div>
   `;
 }
@@ -216,9 +225,11 @@ function setStatus(text, busy = false) {
 let editingId = null;
 let pendingPhotoDataUrl = null;
 let originalPhotoDataUrl = null;
+let convertingWishlistId = null;
 
 function openGarmentModal(existing) {
   editingId = existing ? existing.id : null;
+  convertingWishlistId = null;
   pendingPhotoDataUrl = existing ? existing.photo : null;
   originalPhotoDataUrl = existing ? existing.photo : null;
   document.getElementById("garmentModalTitle").textContent = existing ? "Edit garment" : "Add garment";
@@ -240,6 +251,27 @@ function openGarmentModal(existing) {
     cleanupBtn.hidden = true;
   }
   garmentModal.showModal();
+}
+
+// Pre-fills the "add garment" form from a wishlist entry once the user has bought it.
+// Uses the outfit-matcher's source photo as a starting point (it shows the whole outfit,
+// not just this piece, so the user will likely want to replace it with a proper photo).
+function openGarmentModalFromWishlist(w) {
+  openGarmentModal(null);
+  convertingWishlistId = w.id;
+  document.getElementById("garmentModalTitle").textContent = "Add purchased item";
+  document.getElementById("fName").value = w.name || "";
+  document.getElementById("fCategory").value = w.category || "";
+  document.getElementById("fColors").value = (w.colors || []).join(", ");
+  document.getElementById("fTags").value = (w.tags || []).join(", ");
+  if (w.sourcePhoto) {
+    originalPhotoDataUrl = w.sourcePhoto;
+    pendingPhotoDataUrl = w.sourcePhoto;
+    garmentPhotoPreview.src = w.sourcePhoto;
+    garmentPhotoPreview.hidden = false;
+    cleanupBtn.hidden = false;
+    scanBtn.hidden = !getApiKey();
+  }
 }
 
 garmentPhotoInput.addEventListener("change", async () => {
@@ -322,6 +354,10 @@ garmentForm.addEventListener("submit", async (e) => {
     lastWorn: editingId ? garmentById(editingId).lastWorn || null : null,
   };
   await db.put("garments", record);
+  if (convertingWishlistId) {
+    await db.delete("wishlist", convertingWishlistId);
+    convertingWishlistId = null;
+  }
   await loadAll();
   garmentModal.close();
   render();

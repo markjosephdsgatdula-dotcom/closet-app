@@ -1,12 +1,13 @@
 import { db } from "./db.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export async function exportBackup() {
-  const [garments, outfits, wearLog] = await Promise.all([
+  const [garments, outfits, wearLog, wishlist] = await Promise.all([
     db.getAll("garments"),
     db.getAll("outfits"),
     db.getAll("wearLog"),
+    db.getAll("wishlist"),
   ]);
   const payload = {
     app: "closet-app",
@@ -15,6 +16,7 @@ export async function exportBackup() {
     garments,
     outfits,
     wearLog,
+    wishlist,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -26,7 +28,12 @@ export async function exportBackup() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  return { garmentCount: garments.length, outfitCount: outfits.length, wearLogCount: wearLog.length };
+  return {
+    garmentCount: garments.length,
+    outfitCount: outfits.length,
+    wearLogCount: wearLog.length,
+    wishlistCount: wishlist.length,
+  };
 }
 
 export async function readBackupFile(file) {
@@ -45,13 +52,15 @@ export async function readBackupFile(file) {
 // Replaces all current data with the backup's contents. Caller is responsible for
 // confirming with the user first, since this discards whatever is currently stored.
 export async function importBackup(data) {
-  await Promise.all([db.clear("garments"), db.clear("outfits"), db.clear("wearLog")]);
+  await Promise.all([db.clear("garments"), db.clear("outfits"), db.clear("wearLog"), db.clear("wishlist")]);
   for (const g of data.garments || []) await db.put("garments", g);
   for (const o of data.outfits || []) await db.put("outfits", o);
   for (const w of data.wearLog || []) await db.put("wearLog", w);
+  for (const w of data.wishlist || []) await db.put("wishlist", w);
   return {
     garmentCount: (data.garments || []).length,
     outfitCount: (data.outfits || []).length,
     wearLogCount: (data.wearLog || []).length,
+    wishlistCount: (data.wishlist || []).length,
   };
 }

@@ -1,8 +1,9 @@
 import { db, uid } from "./db.js";
-import { scanGarment, getApiKey, setApiKey } from "./vision.js";
+import { scanGarment, identifyOutfitPieces, getApiKey, setApiKey } from "./vision.js";
 import { normalizePhotoLocal } from "./localCleanup.js";
 import { getLocation, getWeather, generateOutfit } from "./suggest.js";
 import { exportBackup, readBackupFile, importBackup } from "./backup.js";
+import { matchOutfitPieces } from "./matcher.js";
 
 const view = document.getElementById("view");
 const tabButtons = document.querySelectorAll(".tab-btn");
@@ -10,19 +11,22 @@ const tabButtons = document.querySelectorAll(".tab-btn");
 let garments = [];
 let outfits = [];
 let wearLog = [];
+let wishlist = [];
 let activeTab = "closet";
 let activeCategoryFilter = "";
 
 // ---------- data load ----------
 async function loadAll() {
-  [garments, outfits, wearLog] = await Promise.all([
+  [garments, outfits, wearLog, wishlist] = await Promise.all([
     db.getAll("garments"),
     db.getAll("outfits"),
     db.getAll("wearLog"),
+    db.getAll("wishlist"),
   ]);
   garments.sort((a, b) => b.createdAt - a.createdAt);
   outfits.sort((a, b) => b.createdAt - a.createdAt);
   wearLog.sort((a, b) => b.date - a.date);
+  wishlist.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 function garmentById(id) {
@@ -39,7 +43,43 @@ function render() {
   tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.tab === activeTab));
   if (activeTab === "closet") renderCloset();
   else if (activeTab === "outfits") renderOutfits();
-  else renderHistory();
+  else if (activeTab === "history") renderHistory();
+  else renderWishlist();
+}
+
+function renderWishlist() {
+  view.innerHTML = `
+    <button class="primary-btn" id="matchOutfitBtn" style="width:100%;margin-bottom:16px;">📸 Match an outfit photo</button>
+    ${
+      wishlist.length === 0
+        ? `<div class="empty-state">Nothing on your wishlist yet.<br>Match an outfit photo to find pieces you don't own.</div>`
+        : wishlist.map(wishlistItemHtml).join("")
+    }
+  `;
+  document.getElementById("matchOutfitBtn").addEventListener("click", openMatcherModal);
+  view.querySelectorAll("[data-delete-wishlist]").forEach((btn) =>
+    btn.addEventListener("click", () => deleteWishlistItem(btn.dataset.deleteWishlist))
+  );
+}
+
+function wishlistItemHtml(w) {
+  return `
+    <div class="wishlist-item">
+      ${w.sourcePhoto ? `<img src="${w.sourcePhoto}" alt="">` : ""}
+      <div class="wishlist-info">
+        <div class="wishlist-name">${escapeHtml(w.name || w.category)}</div>
+        <div class="wishlist-sub">${escapeHtml(w.category || "")}${w.colors?.length ? " · " + escapeHtml(w.colors.join(", ")) : ""}</div>
+        <div class="wishlist-sub">${(w.tags || []).map((t) => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("")}</div>
+      </div>
+      <button type="button" class="danger-btn" data-delete-wishlist="${w.id}" style="margin:0;">Remove</button>
+    </div>
+  `;
+}
+
+async function deleteWishlistItem(id) {
+  await db.delete("wishlist", id);
+  await loadAll();
+  render();
 }
 
 function renderCloset() {
@@ -532,6 +572,124 @@ async function markGarmentsWorn(garmentIds, outfitName) {
     outfitName: outfitName || null,
   });
 }
+
+// ---------- outfit photo matcher ----------
+const matcherModal = document.getElementById("matcherModal");
+const matcherPhotoInput = document.getElementById("matcherPhotoInput");
+const matcherPhotoPreview = document.getElementById("matcherPhotoPreview");
+const matcherAnalyzeBtn = document.getElementById("matcherAnalyzeBtn");
+const matcherStatusText = document.getElementById("matcherStatusText");
+const matcherSpinner = document.getElementById("matcherSpinner");
+const matcherResults = document.getElementById("matcherResults");
+const matcherSaveBtn = document.getElementById("matcherSaveBtn");
+
+let matcherPhotoDataUrl = null;
+let matcherMatches = [];
+
+function setMatcherStatus(text, busy = false) {
+  matcherStatusText.textContent = text;
+  matcherSpinner.hidden = !busy;
+}
+
+function openMatcherModal() {
+  matcherPhotoDataUrl = null;
+  matcherMatches = [];
+  matcherPhotoPreview.hidden = true;
+  matcherAnalyzeBtn.hidden = true;
+  matcherSaveBtn.hidden = true;
+  matcherResults.innerHTML = "";
+  setMatcherStatus(getApiKey() ? "" : "Add a Gemini API key in Settings first to use outfit matching.");
+  matcherModal.showModal();
+}
+
+matcherPhotoInput.addEventListener("change", async () => {
+  const file = matcherPhotoInput.files[0];
+  if (!file) return;
+  matcherPhotoDataUrl = await fileToResizedDataUrl(file);
+  matcherPhotoPreview.src = matcherPhotoDataUrl;
+  matcherPhotoPreview.hidden = false;
+  matcherResults.innerHTML = "";
+  matcherSaveBtn.hidden = true;
+  if (getApiKey()) {
+    matcherAnalyzeBtn.hidden = false;
+    setMatcherStatus("");
+  } else {
+    setMatcherStatus("Add a Gemini API key in Settings first to use outfit matching.");
+  }
+});
+
+matcherAnalyzeBtn.addEventListener("click", async () => {
+  if (!matcherPhotoDataUrl) return;
+  matcherAnalyzeBtn.disabled = true;
+  setMatcherStatus("Analyzing outfit…", true);
+  matcherResults.innerHTML = "";
+  matcherSaveBtn.hidden = true;
+  try {
+    const pieces = await identifyOutfitPieces(matcherPhotoDataUrl);
+    if (!pieces.length) {
+      setMatcherStatus("Couldn't identify any items in that photo.", false);
+      return;
+    }
+    matcherMatches = matchOutfitPieces(pieces, garments);
+    renderMatcherResults();
+    setMatcherStatus(`Found ${pieces.length} item(s).`, false);
+  } catch (err) {
+    setMatcherStatus(err.message, false);
+  } finally {
+    matcherAnalyzeBtn.disabled = false;
+  }
+});
+
+function renderMatcherResults() {
+  matcherResults.innerHTML = matcherMatches
+    .map(({ piece, match }, i) => {
+      if (match) {
+        return `
+          <div class="match-row">
+            <img src="${match.photo}" alt="">
+            <div class="match-info">
+              <div class="match-name">${escapeHtml(piece.name || piece.category)}</div>
+              <div class="match-sub owned">✓ You already own: ${escapeHtml(match.name || match.category)}</div>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="match-row">
+          <input type="checkbox" data-piece-index="${i}" checked>
+          <div class="match-info">
+            <div class="match-name">${escapeHtml(piece.name || piece.category)}</div>
+            <div class="match-sub unowned">Not in your closet — save to wishlist?</div>
+          </div>
+        </div>`;
+    })
+    .join("");
+  const hasUnmatched = matcherMatches.some((m) => !m.match);
+  matcherSaveBtn.hidden = !hasUnmatched;
+}
+
+document.getElementById("matcherCloseBtn").addEventListener("click", () => matcherModal.close());
+
+matcherSaveBtn.addEventListener("click", async () => {
+  const checkboxes = matcherResults.querySelectorAll("input[type=checkbox]:checked");
+  const indices = [...checkboxes].map((cb) => Number(cb.dataset.pieceIndex));
+  if (!indices.length) return;
+  for (const i of indices) {
+    const { piece } = matcherMatches[i];
+    await db.put("wishlist", {
+      id: uid(),
+      name: piece.name,
+      category: piece.category,
+      colors: piece.colors,
+      tags: piece.tags,
+      sourcePhoto: matcherPhotoDataUrl,
+      createdAt: Date.now(),
+    });
+  }
+  await loadAll();
+  matcherModal.close();
+  activeTab = "wishlist";
+  render();
+});
 
 // ---------- settings ----------
 const settingsModal = document.getElementById("settingsModal");

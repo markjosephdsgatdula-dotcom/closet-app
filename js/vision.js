@@ -145,3 +145,45 @@ Colors should be common color names. Tags should describe style/material/season 
     };
   });
 }
+
+// Identifies every distinct clothing/accessory item visible in a photo of a full outfit
+// (e.g. an inspiration photo found online or of someone else). dataUrl: "data:image/jpeg;base64,...."
+// Returns an array of {category, colors, tags, name} — one per item spotted.
+export async function identifyOutfitPieces(dataUrl) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("No API key set. Add one in Settings to use AI outfit matching.");
+  const { mediaType, base64Data } = parseImageDataUrl(dataUrl);
+
+  const prompt = `You are looking at a photo of an outfit (may be worn by a person, on a hanger, or flat-laid). Identify every distinct clothing/footwear/accessory item visible and respond with ONLY a JSON array, no other text, in this exact shape:
+[{"category":"one of: Shirt, T-Shirt, Jacket, Pants, Jeans, Shorts, Skirt, Dress, Shoes, Accessory, Other","colors":["color1","color2"],"tags":["tag1","tag2"],"name":"short descriptive name"}]
+One array entry per distinct item (e.g. a top, a bottom, shoes are separate entries). Colors should be common color names. Keep each name under 6 words.`;
+
+  const modelIds = await getTextModelIds(apiKey);
+  if (!modelIds.length) throw new Error("No usable text/vision models found for this API key.");
+
+  return tryModelsInOrder(modelIds, async (modelId) => {
+    const data = await callGemini(modelId, apiKey, {
+      contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mediaType, data: base64Data } }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    });
+    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      const err = new Error(`${modelId} returned an unparsable response.`);
+      err.status = 400;
+      throw err;
+    }
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed)) {
+      const err = new Error(`${modelId} did not return a list of items.`);
+      err.status = 400;
+      throw err;
+    }
+    return parsed.map((item) => ({
+      category: item.category || "",
+      colors: Array.isArray(item.colors) ? item.colors : [],
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      name: item.name || "",
+    }));
+  });
+}

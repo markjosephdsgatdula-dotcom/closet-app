@@ -1,5 +1,5 @@
 const DB_NAME = "closet-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -14,6 +14,9 @@ function openDb() {
       }
       if (!db.objectStoreNames.contains("wearLog")) {
         db.createObjectStore("wearLog", { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains("wishlist")) {
+        db.createObjectStore("wishlist", { keyPath: "id" });
       }
     };
     req.onsuccess = () => resolve(req.result);

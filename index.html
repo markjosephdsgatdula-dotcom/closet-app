@@ -33,6 +33,7 @@
     <button class="tab-btn active" data-tab="closet">👕<span>Closet</span></button>
     <button class="tab-btn" data-tab="outfits">🧺<span>Outfits</span></button>
     <button class="tab-btn" data-tab="history">🕘<span>History</span></button>
+    <button class="tab-btn" data-tab="wishlist">🛍<span>Wishlist</span></button>
   </nav>
 
   <button id="addGarmentFab" class="fab" title="Add garment">+</button>
@@ -136,6 +137,30 @@
     <div class="sheet-actions">
       <button type="button" id="outfitCancelBtn" class="secondary-btn">Cancel</button>
       <button type="button" id="outfitSaveBtn" class="primary-btn">Save outfit</button>
+    </div>
+  </dialog>
+
+  <!-- Outfit photo matcher modal -->
+  <dialog id="matcherModal" class="sheet">
+    <div class="sheet-body">
+      <h2>Match an outfit photo</h2>
+      <p class="hint">Photograph an outfit you like (online, or on someone else) and see which pieces you already own, or save the rest to your wishlist.</p>
+
+      <div class="photo-picker">
+        <img id="matcherPhotoPreview" alt="" hidden>
+        <label class="photo-btn" id="matcherPhotoLabel">
+          Choose photo
+          <input type="file" accept="image/*" id="matcherPhotoInput" hidden>
+        </label>
+        <button type="button" id="matcherAnalyzeBtn" class="secondary-btn" hidden>Analyze outfit</button>
+        <p class="status-line"><span id="matcherSpinner" class="spinner" hidden></span><span id="matcherStatusText"></span></p>
+      </div>
+
+      <div id="matcherResults"></div>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" id="matcherCloseBtn" class="secondary-btn">Close</button>
+      <button type="button" id="matcherSaveBtn" class="primary-btn" hidden>Save selected to wishlist</button>
     </div>
   </dialog>
 

@@ -122,6 +122,23 @@ main{padding:16px;max-width:720px;margin:0 auto;}
 .suggestion-slot .slot-label{font-size:.7rem;text-transform:uppercase;color:var(--muted);letter-spacing:.03em;}
 .suggestion-slot .slot-name{font-size:.88rem;font-weight:600;}
 .suggestion-slot.empty{color:var(--muted);font-size:.85rem;font-style:italic;}
+
+.match-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.match-row:last-child{border-bottom:none;}
+.match-row img{width:48px;height:48px;object-fit:cover;border-radius:8px;background:var(--border);flex-shrink:0;}
+.match-row .match-info{flex:1;min-width:0;}
+.match-row .match-name{font-size:.88rem;font-weight:600;}
+.match-row .match-sub{font-size:.72rem;margin-top:2px;}
+.match-row .match-sub.owned{color:#2f7d4f;}
+.match-row .match-sub.unowned{color:var(--accent);}
+.match-row input[type=checkbox]{width:20px;height:20px;flex-shrink:0;}
+
+.wishlist-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;}
+.wishlist-item img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--border);flex-shrink:0;}
+.wishlist-item .wishlist-info{flex:1;min-width:0;}
+.wishlist-item .wishlist-name{font-weight:600;font-size:.9rem;}
+.wishlist-item .wishlist-sub{font-size:.75rem;color:var(--muted);margin-top:2px;}
 .primary-btn{background:var(--accent);color:var(--accent-text);border:none;border-radius:10px;
   padding:10px 18px;font-weight:600;cursor:pointer;}
 .secondary-btn{background:none;border:1px solid var(--border);color:var(--text);border-radius:10px;

@@ -1,5 +1,5 @@
 // Bump this string whenever app files change so clients pick up the new version.
-const CACHE_NAME = "closet-app-v3";
+const CACHE_NAME = "closet-app-v4";
 
 const APP_SHELL = [
   "./",
@@ -11,6 +11,7 @@ const APP_SHELL = [
   "./js/localCleanup.js",
   "./js/suggest.js",
   "./js/backup.js",
+  "./js/matcher.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
